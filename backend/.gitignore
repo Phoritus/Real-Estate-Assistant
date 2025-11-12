@@ -1,6 +1,10 @@
 .env
 .env.*.local
-*/__pycache__/
-*/**/__pycache__/
-.idea/
 .vscode/
+.idea/
+
+# Python caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
