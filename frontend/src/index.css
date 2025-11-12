@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Plus+Jakarta+Sans:wght@500;700&display=swap');
+@import "tailwindcss";
+
+/*
+  Tailwind CSS v4 uses the @theme block to define design tokens.
+  Token names must follow Tailwind's naming conventions to generate utilities.
+  For fonts, use --font-sans / --font-serif / --font-mono instead of a custom --font-family name.
+  For colors, prefix with --color- and then reference via classes like bg-background, text-text, etc.
+*/
+@theme {
+    --color-background: #0E1117; /* dark background */
+    --color-text: #F5F7FA;       /* light foreground text */
+    --color-primary: #0070f3;    /* primary accent color */
+    --color-secondary: #6f5ef9;
+    --color-accent: #ff6ec7;
+    --font-sans: 'Plus Jakarta Sans', 'Roboto', sans-serif; /* override default sans font */
+}
+
+/* Optional: apply tokens directly to the body element so the page gets the theme without manual classes */
+body {
+    /* Animated gradient background */
+    background: radial-gradient(circle at 20% 20%, rgba(111,94,249,0.25), transparent 60%),
+                radial-gradient(circle at 80% 30%, rgba(255,110,199,0.25), transparent 55%),
+                linear-gradient(135deg, #0E1117 0%, #101a2b 50%, #0E1117 100%);
+    min-height: 100vh;
+    background-attachment: fixed;
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection color */
+::selection {
+    background: var(--color-accent);
+    color: #fff;
+}
+
+/* Scrollbar styling (Webkit browsers) */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+::-webkit-scrollbar-thumb { background: linear-gradient(var(--color-secondary), var(--color-primary)); border-radius: 20px; }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(var(--color-accent), var(--color-primary)); }
+
+/* Utility classes */
+.glass-card {
+    backdrop-filter: blur(14px);
+    background: rgba(22,27,34,0.72);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 32px -8px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+}
+.glass-card:before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(111,94,249,0.15) 0%, rgba(255,110,199,0.15) 100%);
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.fade-in { animation: fadeIn 0.6s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity:1; transform: translateY(0);} }
+
+.gradient-text {
+    background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-secondary) 40%, var(--color-accent) 85%);
+    -webkit-background-clip: text;
+    color: transparent;
+}
+
+.soft-border {
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 20px !important;
+}
