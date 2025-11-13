@@ -8,3 +8,10 @@ python-dotenv==1.2.1
 
 fastapi~=0.121.1
 dotenv~=0.9.9
+
+# Auth & security
+python-jose[cryptography]==3.5.0
+python-multipart>=0.0.20
+passlib[bcrypt]==1.7.4
+# Pin bcrypt to a version compatible with passlib to avoid '__about__' error
+bcrypt==4.0.1

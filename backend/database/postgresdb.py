@@ -10,7 +10,6 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 def get_db():
     db = SessionLocal()
     try:
-        print("Database session created.✅")
         yield db
     finally:
         db.close()
