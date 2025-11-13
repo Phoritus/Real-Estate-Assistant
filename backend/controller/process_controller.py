@@ -1,5 +1,5 @@
-from uuid import uuid4
 from env import GROQ_API_KEY
+from uuid import uuid4
 
 if not GROQ_API_KEY:
     raise Exception("GROQ_API_KEY not set in environment variables.")
@@ -10,10 +10,10 @@ from langchain_groq import ChatGroq
 from langchain_chroma import Chroma
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
 from typing import List
+from fastapi import HTTPException
+
 
 # --- Pydantic Models for API Request/Response ---
 
@@ -110,17 +110,9 @@ def generate_answer(query: str):
          sources_output = ", ".join(list(set(doc.metadata.get("source", "Unknown") for doc in sources_output)))
 
     return result.get("answer", "No answer found"), sources_output
+  
 
-
-# --- API Router ---
-
-process_router = APIRouter(
-    prefix="/process",
-    tags=["process"]
-)
-
-@process_router.post("/initialize", status_code=200)
-def initialize():
+def initialize_process():
     """
     Initialize the components (LLM, embeddings, and vector store).
     This should be called once before using other endpoints.
@@ -131,8 +123,7 @@ def initialize():
     except Exception as e:
         print(f"Error initializing components: {e}")
         raise HTTPException(status_code=500, detail=f"Error initializing components: {str(e)}")
-
-@process_router.post("/process-urls", status_code=201)
+      
 def process_urls(payload: UrlList):
     """
     Accept a list of URLs, process each URL to extract text,
@@ -149,8 +140,7 @@ def process_urls(payload: UrlList):
     except Exception as e:
         print(f"Error processing URLs: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing URLs: {str(e)}")
-
-@process_router.post("/query", response_model=AnswerResponse)
+      
 def get_answer(payload: Query):
     """
     Accept a question string, retrieve relevant documents from Vector Store,
@@ -162,6 +152,3 @@ def get_answer(payload: Query):
     except Exception as e:
         print(f"Error generating answer: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating answer: {str(e)}")
-
-
-

@@ -1,4 +1,5 @@
 import re
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -15,6 +16,9 @@ class userSchema(Base):
     )
     username = Column(
         String, unique=True, index=True, nullable=False
+    )
+    lastname = Column(
+        String, unique=False, index=True, nullable=False
     )
     email = Column(
         String, unique=True, index=True, nullable=False
@@ -44,3 +48,13 @@ class userSchema(Base):
             raise ValueError("Invalid email format")
         return email
   
+class PasswordUpdate(BaseModel):
+    current_password: str
+    new_password: str
+    new_password_confirm: str
+
+class UserBase(BaseModel):
+    username: str
+    lastname: str
+    email: EmailStr
+    password: str

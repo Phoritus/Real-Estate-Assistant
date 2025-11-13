@@ -1,3 +1,6 @@
+from typing import Annotated
+from fastapi.params import Depends
+from pytest import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from env import DB_URL
@@ -13,3 +16,5 @@ def get_db():
         yield db
     finally:
         db.close()
+        
+dbSession = Annotated[Session, Depends(get_db)]
