@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from controller.process_controller import (
     initialize_process,
     process_urls,
@@ -7,7 +7,7 @@ from controller.process_controller import (
     UrlList,
     Query,
 )
-from ..rate_limiting import limiter
+from rate_limiting import limiter
 
 # --- API Router ---
 
@@ -15,15 +15,12 @@ process_router = APIRouter(
     prefix="/process",
     tags=["process"]
 )
-@limiter.limit("5/minute")(process_router)
-
-@process_router.post("/initialize", status_code=200)
-async def initialize():
-    return initialize_process()
 
 
 @process_router.post("/process-urls", status_code=201)
-async def process_url_list(payload: UrlList):
+@limiter.limit("5/minute")
+async def process_url_list(payload: UrlList, request: Request):
+    initialize_process()
     return process_urls(payload)
 
 

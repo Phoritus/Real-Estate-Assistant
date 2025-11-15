@@ -15,10 +15,10 @@ class userSchema(Base):
         Integer, primary_key=True, index=True, autoincrement=True
     )
     username = Column(
-        String, unique=True, index=True, nullable=False
+        String
     )
     lastname = Column(
-        String, unique=False, index=True, nullable=False
+        String
     )
     email = Column(
         String, unique=True, index=True, nullable=False

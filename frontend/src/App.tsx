@@ -1,13 +1,16 @@
 import { useMemo, useState, useContext } from 'react';
-import { BrowserRouter, Routes, Route, Link as RouterLink } from 'react-router-dom';
-import { AppBar, Toolbar, Button, Chip, Container, LinearProgress, Paper, Stack, TextField, Typography, Box } from '@mui/material';
+import { BrowserRouter, Routes, Route, Link as RouterLink, useNavigate } from 'react-router-dom';
+import { AppBar, Toolbar, Button, Chip, Container, LinearProgress, Paper, Stack, TextField, Typography, Box, Backdrop, CircularProgress } from '@mui/material';
 import './index.css';
 import Home from './pages/Home.tsx';
 import Login from './pages/Login.tsx';
 import SignUp from './pages/SignUp.tsx';
+import Profile from './pages/Profile.tsx';
 import { ProtectedRoute } from './components/ProtectedRoute.tsx';
 import { AuthProvider, AuthContext } from './context/AuthContext.tsx';
 import LoadingIcon from './components/LoadingIcon.tsx';
+import axios from 'axios';
+
 
 // Keep validators
 const isValidUrl = (value: string) => {
@@ -22,6 +25,7 @@ function FunctionPage() {
   const [url3, setUrl3] = useState('');
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [answer, setAnswer] = useState('');
   const [sources, setSources] = useState<string[]>([]);
@@ -40,7 +44,6 @@ function FunctionPage() {
     setAnswer('');
     setSources([]);
 
-    // basic checks
     const provided = [url1, url2, url3].filter(Boolean);
     if (provided.length === 0) {
       setError('Please provide at least 1 URL');
@@ -55,22 +58,31 @@ function FunctionPage() {
       return;
     }
 
+    const axiosInstance = axios.create({
+      baseURL: 'http://localhost:8000',
+      withCredentials: true,
+    });
+
     setLoading(true);
     try {
-      // TODO: Replace this mock with real API call
-      // Simulate processing delay
-      await new Promise((res) => setTimeout(res, 1100));
+      // 1) Process URLs
+      setLoadingStage('Initializing & indexing sources…');
+      await axiosInstance.post('/process/process-urls', { urls: provided });
 
-      // Mock answer and echo sources
-      setAnswer(
-        'Sample synthesized answer from the provided sources:\n• Key insights extracted from each page.\n• Connect a backend LLM/RAG pipeline to produce real deep analysis.\n\nThis is a mock; integrate your API next. 🚀'
-      );
-      setSources(provided);
+      // 2) Query answer
+      setLoadingStage('Generating answer…');
+      const { data } = await axiosInstance.post('/process/query', { question: question.trim() });
+
+      setAnswer(data?.answer || 'No answer');
+      const src = (data?.sources || '') as string;
+      const list = src ? src.split(',').map((s: string) => s.trim()).filter(Boolean) : provided;
+      setSources(list);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Unexpected error occurred';
       setError(message);
     } finally {
       setLoading(false);
+      setLoadingStage(null);
     }
   };
 
@@ -83,7 +95,7 @@ function FunctionPage() {
     setSources([]);
     setError(null);
   };
-
+  
   return (
     <Container maxWidth="md" sx={{ py: { xs: 4, md: 6 } }}>
       <Stack spacing={3} className="fade-in">
@@ -235,6 +247,12 @@ function FunctionPage() {
             </Stack>
           </Paper>
         )}
+        <Backdrop open={loading} sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+          <Stack alignItems="center" spacing={2}>
+            <CircularProgress color="inherit" />
+            <Typography variant="body2">{loadingStage || 'Processing…'}</Typography>
+          </Stack>
+        </Backdrop>
       </Stack>
     </Container>
   );
@@ -244,6 +262,7 @@ function NavBar() {
   const auth = useContext(AuthContext);
   const isAuthenticated = Boolean(auth?.isAuthenticated);
   const logout = auth?.logout ?? (() => {});
+  const navigate = useNavigate();
   return (
     <AppBar position="sticky" color="transparent" elevation={0} sx={{ backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
       <Toolbar sx={{ gap: 2 }}>
@@ -253,6 +272,11 @@ function NavBar() {
         <Button component={RouterLink} to="/function" color="inherit" sx={{ fontWeight: 700 }}>
           Function
         </Button>
+        {isAuthenticated && (
+          <Button component={RouterLink} to="/profile" color="inherit" sx={{ fontWeight: 700 }}>
+            Profile
+          </Button>
+        )}
         {!isAuthenticated && (
           <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
             <Button component={RouterLink} to="/login" color="inherit">Login</Button>
@@ -260,7 +284,7 @@ function NavBar() {
           </Box>
         )}
         {isAuthenticated && (
-          <Button onClick={logout} color="inherit" sx={{ ml: 'auto' }}>
+          <Button onClick={async () => { await logout(); navigate('/login', { replace: true }); }} color="inherit" sx={{ ml: 'auto' }}>
             Logout
           </Button>
         )}
@@ -278,6 +302,7 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/function" element={<ProtectedRoute><FunctionPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );

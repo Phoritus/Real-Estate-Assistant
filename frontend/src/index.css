@@ -30,11 +30,22 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Selection color */
-::selection {
-    background: var(--color-accent);
-    color: #fff;
-}
+/* Selection color: global */
+::selection { background: rgb(26, 26, 171); color: #fff; }
+::-moz-selection { background: rgb(26, 26, 171); color: #fff; }
+
+/* Make selection visible inside inputs/textareas and MUI inputs */
+input::selection,
+textarea::selection,
+.MuiInputBase-input::selection,
+.MuiOutlinedInput-input::selection { background: rgba(111,94,249,0.55); color: #fff; }
+input::-moz-selection,
+textarea::-moz-selection,
+.MuiInputBase-input::-moz-selection,
+.MuiOutlinedInput-input::-moz-selection { background: rgba(111,94,249,0.55); color: #fff; }
+
+/* Improve caret visibility on dark backgrounds */
+input, textarea, .MuiInputBase-input, .MuiOutlinedInput-input { caret-color: var(--color-accent); }
 
 /* Scrollbar styling (Webkit browsers) */
 ::-webkit-scrollbar { width: 10px; }

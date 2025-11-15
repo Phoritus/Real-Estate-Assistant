@@ -1,19 +1,24 @@
-from env import GROQ_API_KEY
+from env import GROQ_API_KEY, CHROMA_API_KEY, CHROMA_TENANT, CHROMA_DATABASE
 from uuid import uuid4
 
 if not GROQ_API_KEY:
     raise Exception("GROQ_API_KEY not set in environment variables.")
 
-from langchain_classic.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_groq import ChatGroq
-from langchain_chroma import Chroma
-from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, HttpUrl
 from typing import List
+import re
 from fastapi import HTTPException
+import chromadb
+from chromadb.utils import embedding_functions
 
+client = chromadb.CloudClient(
+  api_key=CHROMA_API_KEY,
+  tenant=CHROMA_TENANT,
+  database=CHROMA_DATABASE
+)
 
 # --- Pydantic Models for API Request/Response ---
 
@@ -46,47 +51,57 @@ def initialize_component():
     )
     print("Initialized LLM")
 
-    print("Initial Embeddings")
-    embeddings = HuggingFaceEmbeddings(
-        model_name="intfloat/multilingual-e5-large",
-        model_kwargs={"trust_remote_code": True},
+    print("Initial Embeddings Function (Chroma)")
+    # Use Chroma's embedding function compatible with Cloud collections
+    embeddings = embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name="intfloat/multilingual-e5-large"
     )
-    print("Initialized Embeddings")
+    print("Initialized Embeddings Function")
 
-    print("Initial Chroma Vector Store")
-    vector_store = Chroma(
-        collection_name="real_estate_documents",
+    print("Initial Chroma Cloud Collection")
+    vector_store = client.get_or_create_collection(
+        name="real_estate_documents",
         embedding_function=embeddings,
-        persist_directory="../chroma_db",
     )
-    print("Initialized Chroma Vector Store")
+    print("Initialized Chroma Cloud Collection")
 
 
-def process_url(url_list: List[str]):
+
+def process_single_url(url: str) -> int:
+    """
+    Process a single URL: load, split, embed, and store in the vector store.
+    Returns the number of chunks added for this URL.
+    """
     if embeddings is None or vector_store is None:
         print("Components not initialized. Please call initialize_component() first.")
         raise Exception("Components not initialized.")
 
-    loader = WebBaseLoader(url_list)
+    loader = WebBaseLoader([url])
     documents = loader.load()
 
-    print("Splitting documents...")
+    print(f"Splitting documents for URL: {url} ...")
     text_splitter = RecursiveCharacterTextSplitter(
         separators=["\n\n", "\n", " "],
         chunk_size=1000,
         chunk_overlap=200,
     )
     docs = text_splitter.split_documents(documents)
-    print(f"Documents split completed. Found {len(docs)} chunks.")
+    print(f"URL {url} split completed. Found {len(docs)} chunks.")
 
-    print("Adding documents to vector store...")
+    print(f"Adding {len(docs)} chunks to vector store for URL: {url} ...")
     uid = [str(uuid4()) for _ in range(len(docs))]
 
-    vector_store.add_documents(
-        documents=docs,
-        ids=uid
+    # Upsert raw texts and metadatas into Chroma Cloud
+    vector_store.upsert(
+        documents=[d.page_content for d in docs],
+        metadatas=[d.metadata for d in docs],
+        ids=uid,
     )
-    print(f"Documents added to vector store. Total documents: {vector_store._collection.count()}")
+    try:
+        total = vector_store.count()
+    except Exception:
+        total = 'unknown'
+    print(f"Done adding for URL {url}. Total documents: {total}")
     return len(docs)
 
 
@@ -94,22 +109,49 @@ def generate_answer(query: str):
     if vector_store is None or llm is None:
         raise Exception("Vector store or LLM is not initialized.")
 
-    print("RetrievalQAWithSourcesChain processing...")
-    chain = RetrievalQAWithSourcesChain.from_llm(
-        llm=llm,
-        retriever=vector_store.as_retriever(),
-        return_source_documents=True,
+    print("Querying Chroma for top documents...")
+    qres = vector_store.query(query_texts=[query], n_results=5)
+    # Results are lists per query; we used a single query so index 0
+    docs_texts = qres.get("documents", [[]])[0] if qres else []
+    metadatas = qres.get("metadatas", [[]])[0] if qres else []
+
+    context = "\n\n".join(docs_texts)
+    prompt = (
+        "You are a helpful real estate analysis assistant. "
+        "Answer the user's question only using the context. "
+        "If the answer is not in the context, say you don't know.\n\n"
+        f"Context:\n{context}\n\n"
+        f"Question: {query}\n"
+        "Answer:"
     )
 
-    print("Generating answer...")
-    result = chain.invoke({"question": query})
+    print("Generating answer with LLM...")
+    llm_result = llm.invoke(prompt)
+    # Extract content depending on return type
+    if isinstance(llm_result, str):
+        answer_text = llm_result
+    else:
+        # LangChain ChatGroq returns a BaseMessage with .content
+        answer_text = getattr(llm_result, "content", str(llm_result))
+
+    # Sanitize answer text
+    for token in ("SOURCES:", "Sources:", "Source:"):
+        idx = answer_text.find(token)
+        if idx != -1:
+            answer_text = answer_text[:idx].strip()
+            break
+    answer_text = re.sub(r"^\s*(FINAL\s+ANSWER:|Final\s+Answer:|Answer:)\s*", "", answer_text, flags=re.IGNORECASE)
+
+    # Build sources from metadatas
+    sources_set = []
+    for md in metadatas:
+        src = md.get("source") or md.get("url") or "Unknown"
+        if src not in sources_set:
+            sources_set.append(src)
+    sources_output = ", ".join(sources_set) if sources_set else "No sources found"
+
     print("Answer generated.")
-
-    sources_output = result.get("sources", "No sources found")
-    if isinstance(sources_output, list):
-         sources_output = ", ".join(list(set(doc.metadata.get("source", "Unknown") for doc in sources_output)))
-
-    return result.get("answer", "No answer found"), sources_output
+    return answer_text, sources_output
   
 
 def initialize_process():
@@ -128,18 +170,39 @@ def process_urls(payload: UrlList):
     """
     Accept a list of URLs, process each URL to extract text,
     split into chunks, generate embeddings, and store in Vector Store.
+    Processes URLs individually to continue on errors and report per-URL results.
     """
-    try:
-        # Convert URLs to strings
-        url_strings = [str(url) for url in payload.urls]
-        num_chunks = process_url(url_strings)
-        return {
-            "message": f"Successfully processed {len(url_strings)} URLs.",
-            "chunks_added": num_chunks
-        }
-    except Exception as e:
-        print(f"Error processing URLs: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing URLs: {str(e)}")
+    # Convert URLs to strings
+    url_strings = [str(url) for url in payload.urls]
+
+    total_chunks = 0
+    successes = []  # list of {url, chunks}
+    failures = []   # list of {url, error}
+
+    for url in url_strings:
+        try:
+            chunks = process_single_url(url)
+            total_chunks += chunks
+            successes.append({"url": url, "chunks": chunks})
+        except Exception as e:
+            print(f"Error processing URL {url}: {e}")
+            failures.append({"url": url, "error": str(e)})
+
+    message = (
+        f"Processed {len(url_strings)} URLs. "
+        f"Success: {len(successes)}, Failed: {len(failures)}."
+    )
+
+    # Maintain backward-compatible key 'chunks_added' while adding details
+    return {
+        "message": message,
+        "chunks_added": total_chunks,
+        "total_chunks": total_chunks,
+        "details": {
+            "success": successes,
+            "failed": failures,
+        },
+    }
       
 def get_answer(payload: Query):
     """

@@ -10,7 +10,7 @@ export default function Home() {
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={6} alignItems="center">
           <Box sx={{ flex: 1, textAlign: { xs: 'center', md: 'left' } }}>
             <Chip label="AI Powered" color="secondary" variant="outlined" sx={{ mb: 2, fontWeight: 600 }} />
-            <Typography variant="h3" fontWeight={800} gutterBottom className="gradient-text" sx={{ lineHeight: 1.1 }}>
+            <Typography variant="h3" fontWeight={800} gutterBottom className="text-amber-100" sx={{ lineHeight: 1.1 }}>
               Real Estate Assistant
             </Typography>
             <Typography variant="h6" color="text.secondary" sx={{ mb: 3, maxWidth: 620, mx: { xs: 'auto', md: 0 } }}>

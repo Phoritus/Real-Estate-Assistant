@@ -1,18 +1,31 @@
 from fastapi import FastAPI
 from fastapi_fortify import SecurityMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from router import auth_routes, user_routes, process_routes
 from database.postgresdb import engine
 from models import user_model
 from middlewares.error_middleware import setup_exception_handlers
+from env import DEV_PORT
 
 print("Server startup: Initializing components...")
 print("Creating database tables...📑")
 user_model.Base.metadata.create_all(bind=engine)
 print("Database tables created.✅")
 
+origin = [
+    DEV_PORT
+    
+]
 
 app = FastAPI()
 app.add_middleware(SecurityMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origin,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 setup_exception_handlers(app)
 
 #--- Include Routers ---

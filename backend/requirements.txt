@@ -15,3 +15,6 @@ python-multipart>=0.0.20
 passlib[bcrypt]==1.7.4
 # Pin bcrypt to a version compatible with passlib to avoid '__about__' error
 bcrypt==4.0.1
+httpx>=0.26.0
+chromadb>=0.5.5
+sentence-transformers>=2.2.2
