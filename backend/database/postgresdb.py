@@ -1,6 +1,6 @@
 from typing import Annotated
 from fastapi.params import Depends
-from pytest import Session
+from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from env import DB_URL

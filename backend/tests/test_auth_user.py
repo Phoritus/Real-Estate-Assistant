@@ -1,4 +1,6 @@
 import os
+import sys
+import pathlib
 import uuid
 from fastapi.testclient import TestClient
 
@@ -9,6 +11,11 @@ os.environ.setdefault("JWT_SECRET_KEY", "testsecret")
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 os.environ.setdefault("JWT_EXPIRATION_TIME", "60")  # minutes
 os.environ.setdefault("DEV_PORT", "http://testclient")
+
+# Ensure backend root is on sys.path for CI runners
+BACKEND_ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from main import app  # import FastAPI app directly when running in backend dir
 client = TestClient(app)

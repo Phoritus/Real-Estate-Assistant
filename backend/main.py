@@ -1,5 +1,10 @@
 from fastapi import FastAPI
-from fastapi_fortify import SecurityMiddleware
+try:
+    from fastapi_fortify import SecurityMiddleware
+    _SECURITY_AVAILABLE = True
+except Exception:
+    SecurityMiddleware = None  # type: ignore
+    _SECURITY_AVAILABLE = False
 from fastapi.middleware.cors import CORSMiddleware
 from router import auth_routes, user_routes, process_routes
 from database.postgresdb import engine
@@ -18,7 +23,8 @@ origin = [
 ]
 
 app = FastAPI()
-app.add_middleware(SecurityMiddleware)
+if _SECURITY_AVAILABLE and SecurityMiddleware:
+    app.add_middleware(SecurityMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origin,
