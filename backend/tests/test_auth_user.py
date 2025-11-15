@@ -10,9 +10,7 @@ os.environ.setdefault("JWT_ALGORITHM", "HS256")
 os.environ.setdefault("JWT_EXPIRATION_TIME", "60")  # minutes
 os.environ.setdefault("DEV_PORT", "http://testclient")
 
-from backend import main  # type: ignore
-
-app = main.app
+from main import app  # import FastAPI app directly when running in backend dir
 client = TestClient(app)
 
 

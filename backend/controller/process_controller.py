@@ -37,11 +37,12 @@ class AnswerResponse(BaseModel):
 llm = None
 embeddings = None
 vector_store = None
+client = None
 
 # --- Component Initialization Functions ---
 
 def initialize_component():
-    global llm, embeddings, vector_store
+    global llm, embeddings, vector_store, client
 
     print("Initial LLM")
     llm = ChatGroq(
@@ -58,7 +59,15 @@ def initialize_component():
     )
     print("Initialized Embeddings Function")
 
+    # Initialize Chroma Cloud client lazily to avoid import-time env errors
+    if not (CHROMA_API_KEY and CHROMA_TENANT and CHROMA_DATABASE):
+        raise Exception("Chroma Cloud environment variables are not configured.")
     print("Initial Chroma Cloud Collection")
+    client = chromadb.CloudClient(
+        api_key=CHROMA_API_KEY,
+        tenant=CHROMA_TENANT,
+        database=CHROMA_DATABASE,
+    )
     vector_store = client.get_or_create_collection(
         name="real_estate_documents",
         embedding_function=embeddings,
