@@ -56,7 +56,7 @@ def initialize_component():
     print("Initial Embeddings Function (Chroma)")
     # Use Chroma's embedding function compatible with Cloud collections
     embeddings = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="intfloat/multilingual-e5-large"
+        model_name="intfloat/multilingual-e5-small"
     )
     print("Initialized Embeddings Function")
 
