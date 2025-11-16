@@ -13,6 +13,8 @@ JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM")
 JWT_EXPIRATION_TIME = int(os.environ.get("JWT_EXPIRATION_TIME", 1))
 DEV_PORT = os.environ.get("DEV_PORT")
 
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+
 CHROMA_API_KEY = os.environ.get("CHROMA_API_KEY")
 CHROMA_TENANT = os.environ.get("CHROMA_TENANT")
 CHROMA_DATABASE = os.environ.get("CHROMA_DATABASE")

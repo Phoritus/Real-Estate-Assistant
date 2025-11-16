@@ -7,6 +7,7 @@ if not GROQ_API_KEY:
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_groq import ChatGroq
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, HttpUrl
 from typing import List
 import re
@@ -29,7 +30,7 @@ class Query(BaseModel):
     question: str
 
 class AnswerResponse(BaseModel):
-    answer: str
+    answer: str | list[str]
     sources: str
 
 # --- Global Variables ---
@@ -117,31 +118,70 @@ def process_single_url(url: str) -> int:
 def generate_answer(query: str):
     if vector_store is None or llm is None:
         raise Exception("Vector store or LLM is not initialized.")
+    
+    
 
     print("Querying Chroma for top documents...")
     qres = vector_store.query(query_texts=[query], n_results=5)
     # Results are lists per query; we used a single query so index 0
-    docs_texts = qres.get("documents", [[]])[0] if qres else []
-    metadatas = qres.get("metadatas", [[]])[0] if qres else []
+    raw_docs = (qres.get("documents") or [[]])[0] if qres else []
+    metadatas = (qres.get("metadatas") or [[]])[0] if qres else []
+
+    # Normalize documents into a flat list of strings
+    docs_texts: list[str] = []
+    for d in raw_docs:
+        if d is None:
+            continue
+        if isinstance(d, (list, tuple)):
+            for x in d:
+                if x is not None:
+                    docs_texts.append(str(x))
+        else:
+            docs_texts.append(str(d))
 
     context = "\n\n".join(docs_texts)
-    prompt = (
-        "You are a helpful real estate analysis assistant. "
-        "Answer the user's question only using the context. "
-        "If the answer is not in the context, say you don't know.\n\n"
-        f"Context:\n{context}\n\n"
-        f"Question: {query}\n"
-        "Answer:"
-    )
-
+    # Build a proper chat prompt; from_template expects a string, not a list
+    # Use from_messages with role-tagged templates and align variable names
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful real estate analysis assistant."),
+        (
+            "user",
+            "Answer the user's question only using the context. If the answer is not in the context, say you don't know.\n\n"
+            "Context:\n{context}\n\nQuestion: {question}\nAnswer:",
+        ),
+    ])
     print("Generating answer with LLM...")
-    llm_result = llm.invoke(prompt)
-    # Extract content depending on return type
+    chain = prompt | llm
+    llm_result = chain.invoke({"context": context, "question": query})
+    # Extract content depending on return type (handle BaseMessage, dict, list)
+    try:
+        from langchain_core.messages import BaseMessage  # lazy import, avoids hard dependency at module import time
+    except Exception:
+        BaseMessage = tuple()  # type: ignore
+
     if isinstance(llm_result, str):
         answer_text = llm_result
+    elif isinstance(llm_result, BaseMessage):  # type: ignore[arg-type]
+        content = getattr(llm_result, "content", "")
+        if isinstance(content, list):
+            answer_text = " ".join(str(x) for x in content)
+        else:
+            answer_text = str(content)
+    elif isinstance(llm_result, dict):
+        if "text" in llm_result:
+            answer_text = str(llm_result.get("text", ""))
+        elif "content" in llm_result:
+            ct = llm_result.get("content", "")
+            if isinstance(ct, list):
+                answer_text = " ".join(str(x) for x in ct)
+            else:
+                answer_text = str(ct)
+        else:
+            answer_text = str(llm_result)
+    elif isinstance(llm_result, (list, tuple)):
+        answer_text = " ".join(str(x) for x in llm_result)
     else:
-        # LangChain ChatGroq returns a BaseMessage with .content
-        answer_text = getattr(llm_result, "content", str(llm_result))
+        answer_text = str(llm_result)
 
     # Sanitize answer text
     for token in ("SOURCES:", "Sources:", "Source:"):
@@ -151,13 +191,30 @@ def generate_answer(query: str):
             break
     answer_text = re.sub(r"^\s*(FINAL\s+ANSWER:|Final\s+Answer:|Answer:)\s*", "", answer_text, flags=re.IGNORECASE)
 
-    # Build sources from metadatas
-    sources_set = []
-    for md in metadatas:
-        src = md.get("source") or md.get("url") or "Unknown"
-        if src not in sources_set:
-            sources_set.append(src)
-    sources_output = ", ".join(sources_set) if sources_set else "No sources found"
+    # Build sources from metadatas (normalize to strings)
+    source_items: list[str] = []
+    for md in metadatas or []:
+        if not isinstance(md, dict):
+            # If metadata comes nested or as other types, coerce to string
+            source_items.append(str(md))
+            continue
+        src = md.get("source") or md.get("url") or None
+        if src is None:
+            continue
+        if isinstance(src, (list, tuple)):
+            for s in src:
+                if s:
+                    source_items.append(str(s))
+        else:
+            source_items.append(str(src))
+    # Deduplicate while preserving order
+    seen = set()
+    deduped = []
+    for s in source_items:
+        if s not in seen:
+            seen.add(s)
+            deduped.append(s)
+    sources_output = ", ".join(deduped) if deduped else "No sources found"
 
     print("Answer generated.")
     return answer_text, sources_output

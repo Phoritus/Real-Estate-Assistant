@@ -12,10 +12,10 @@ from models import user_model
 from middlewares.error_middleware import setup_exception_handlers
 from env import DEV_PORT
 
-print("Server startup: Initializing components...")
-print("Creating database tables...📑")
-user_model.Base.metadata.create_all(bind=engine)
-print("Database tables created.✅")
+# print("Server startup: Initializing components...")
+# print("Creating database tables...📑")
+# user_model.Base.metadata.create_all(bind=engine)
+# print("Database tables created.✅")
 
 origin = [
     DEV_PORT
