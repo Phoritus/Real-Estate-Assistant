@@ -44,9 +44,3 @@ app.include_router(process_routes.process_router)
 @app.get("/", response_class=HTMLResponse)
 async def root():
     return HTML_CONTENT
-
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(PORT)
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
