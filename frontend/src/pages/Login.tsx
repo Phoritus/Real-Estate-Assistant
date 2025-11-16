@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate, Navigate, Link as RouterLink } from "react-router-dom";
 import {
@@ -22,9 +22,10 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import LoadingIcon from "../components/LoadingIcon.tsx";
 import axios from "axios";
+import { BASE_URL } from "../config/env.tsx"
 
 const axiosInstance = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: BASE_URL,
   withCredentials: true,
 });
 
