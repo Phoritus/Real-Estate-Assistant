@@ -13,6 +13,7 @@ from controller.user_controller import create_user
 from database.postgresdb import dbSession
 from models.user_model import userSchema, UserBase
 from models.auth_model import Token
+from sqlalchemy import select
 
 if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET or not GITHUB_REDIRECT_URI:
     raise ValueError("GitHub OAuth credentials are not set in environment variables.")
@@ -71,12 +72,13 @@ async def github_callback(request: Request) -> dict:
 
         return user_info
       
-def login_with_github(user_info: dict, db: dbSession, remember: bool = False) -> Token:
+async def login_with_github(user_info: dict, db: dbSession, remember: bool = False) -> Token:
     email = user_info.get("email")
     if not email:
         raise HTTPException(status_code=400, detail="Email not available from GitHub profile.")
 
-    user = db.query(userSchema).filter(userSchema.email == email).first()
+    result = await db.execute(select(userSchema).where(userSchema.email == email))
+    user = result.scalar_one_or_none()
     if not user:
         login_name = user_info.get("login") or email.split("@")[0]
         display_name = user_info.get("name") or ""
@@ -92,7 +94,7 @@ def login_with_github(user_info: dict, db: dbSession, remember: bool = False) ->
             email=email,
             password=random_password,
         )
-        user = create_user(new_user, db)["data"]["user"]
+        user = (await create_user(new_user, db))["data"]["user"]
 
     token_str = create_access_token(subject=user.email, user_id=user.id, remember=remember)
     return Token(access_token=token_str, token_type="bearer")

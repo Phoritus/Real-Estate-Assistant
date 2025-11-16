@@ -11,7 +11,7 @@ user_router = APIRouter(
 
 @user_router.get("/")
 async def get_users(db: dbSession):
-    db_users = user_controller.get_users(db)
+    db_users = await user_controller.get_users(db)
     return {"users": db_users}
 
 
@@ -23,9 +23,9 @@ def get_current_user(current_user: auth_controller.CurrentUser, db: dbSession):
 
 @user_router.put("/change-password", status_code=status.HTTP_200_OK)
 async def change_password(current_user: auth_controller.CurrentUser, password_update: user_model.PasswordUpdate, db: dbSession):
-    return user_controller.change_password(current_user.id, password_update, db)
+    return await user_controller.change_password(current_user.id, password_update, db)
 
 @user_router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(current_user: auth_controller.CurrentUser, db: dbSession):
-    return user_controller.delete_user(current_user.id, db)
+    return await user_controller.delete_user(current_user.id, db)
     

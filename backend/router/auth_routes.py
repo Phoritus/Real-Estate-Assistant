@@ -28,11 +28,11 @@ router = APIRouter(
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_user(user: UserBase, db: dbSession):
-    return create_user(user, db)
+    return await create_user(user, db)
 
 @router.post("/login", response_model=Token)
 async def login(response: Response, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: dbSession, remember: bool = False):
-    token = login_for_access_token(form_data, db, remember)
+    token = await login_for_access_token(form_data, db, remember)
     
     # set token in a cookie
     response.set_cookie(
@@ -67,7 +67,7 @@ async def get_google_login_url():
 @router.get("/google-callback")
 async def handle_google_callback(request: Request, db: dbSession):
     user_info = await google_callback(request)
-    token = login_with_google(user_info, db)
+    token = await login_with_google(user_info, db)
     
     # Redirect to home and set token in cookie
     front_url = "http://localhost:5173"
@@ -92,7 +92,7 @@ async def get_facebook_login_url():
 @router.get("/facebook-callback")
 async def handle_facebook_callback(request: Request, db: dbSession):
     user_info = await facebook_callback(request)
-    token = login_with_facebook(user_info, db)
+    token = await login_with_facebook(user_info, db)
 
     front_url = "http://localhost:5173"
     response = RedirectResponse(url=front_url, status_code=status.HTTP_302_FOUND)
@@ -116,7 +116,7 @@ async def get_github_login_url():
 @router.get("/github-callback")
 async def handle_github_callback(request: Request, db: dbSession):
     user_info = await github_callback(request)
-    token = login_with_github(user_info, db)
+    token = await login_with_github(user_info, db)
 
     front_url = "http://localhost:5173"
     response = RedirectResponse(url=front_url, status_code=status.HTTP_302_FOUND)

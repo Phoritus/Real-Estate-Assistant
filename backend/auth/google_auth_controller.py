@@ -9,6 +9,7 @@ from models.auth_model import Token
 from controller.user_controller import create_user
 from models.user_model import userSchema, UserBase
 import secrets
+from sqlalchemy import select
 
 if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET or not GOOGLE_REDIRECT_URI:
     raise ValueError("Google OAuth2 credentials are not set in environment variables.")
@@ -64,7 +65,7 @@ async def google_callback(request: Request):
         return user_info  # For demonstration, returning user info directly
     
 
-def login_with_google(user_info: dict, db: dbSession, remember: bool = False) -> Token:
+async def login_with_google(user_info: dict, db: dbSession, remember: bool = False) -> Token:
     """Find or create a user from Google profile, then issue a JWT.
 
     For new users, we generate a random placeholder password since the DB schema
@@ -75,14 +76,15 @@ def login_with_google(user_info: dict, db: dbSession, remember: bool = False) ->
         raise HTTPException(status_code=400, detail="Email not found in Google user info.")
 
     # Look up by email directly (no password verification for OAuth)
-    user = db.query(userSchema).filter(userSchema.email == email).first()
+    result = await db.execute(select(userSchema).where(userSchema.email == email))
+    user = result.scalar_one_or_none()
 
     if not user:
         username = user_info.get("given_name") or (email.split("@")[0])
         lastname = user_info.get("family_name") or ""
         temp_password = secrets.token_urlsafe(12)  # placeholder
         new_user = UserBase(username=username, lastname=lastname, email=email, password=temp_password)
-        user = create_user(new_user, db)["data"]["user"]
+        user = (await create_user(new_user, db))["data"]["user"]
 
     access_token = create_access_token(subject=user.email, user_id=user.id)
     return Token(access_token=access_token, token_type="bearer")

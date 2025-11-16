@@ -13,6 +13,7 @@ from controller.user_controller import create_user
 from database.postgresdb import dbSession
 from models.user_model import userSchema, UserBase
 from models.auth_model import Token
+from sqlalchemy import select
 
 
 if not FACEBOOK_CLIENT_ID or not FACEBOOK_CLIENT_SECRET or not FACEBOOK_REDIRECT_URI:
@@ -62,20 +63,21 @@ async def facebook_callback(request: Request) -> dict:
         return user_resp.json()
 
 
-def login_with_facebook(user_info: dict, db: dbSession, remember: bool = False) -> Token:
+async def login_with_facebook(user_info: dict, db: dbSession, remember: bool = False) -> Token:
     print("Facebook user info:", user_info)
     email = user_info.get("email")
     if not email:
         # Some Facebook accounts may not have email if permission not granted
         raise HTTPException(status_code=400, detail="Email not found in Facebook user info.")
 
-    user = db.query(userSchema).filter(userSchema.email == email).first()
+    result = await db.execute(select(userSchema).where(userSchema.email == email))
+    user = result.scalar_one_or_none()
     if not user:
         username = user_info.get("first_name") or (email.split("@")[0])
         lastname = user_info.get("last_name") or ""
         temp_password = secrets.token_urlsafe(12)
         new_user = UserBase(username=username, lastname=lastname, email=email, password=temp_password)
-        user = create_user(new_user, db)["data"]["user"]
+        user = (await create_user(new_user, db))["data"]["user"]
 
     token = create_access_token(subject=user.email, user_id=user.id, remember=remember)
     return Token(access_token=token, token_type="bearer")

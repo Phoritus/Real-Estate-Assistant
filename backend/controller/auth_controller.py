@@ -4,8 +4,8 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from models import user_model, auth_model
-from database.postgresdb import get_db
-from sqlalchemy.orm import Session
+from database.postgresdb import dbSession
+from sqlalchemy import select
 from env import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_EXPIRATION_TIME
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
@@ -25,8 +25,11 @@ def create_access_token(subject: str, user_id: int, remember: bool = False) -> s
     to_encode = {"sub": subject, "id": user_id, "exp": expires}
     return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
-def authenticate_user(email: str, password: str, db: Session) -> user_model.userSchema | bool:
-    user = db.query(user_model.userSchema).filter(user_model.userSchema.email == email).first()
+async def authenticate_user(email: str, password: str, db: dbSession) -> user_model.userSchema | bool:
+    result = await db.execute(
+        select(user_model.userSchema).where(user_model.userSchema.email == email)
+    )
+    user = result.scalar_one_or_none()
     if not user or not verify_password(password, user.password):
         return False
     return user
@@ -55,7 +58,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 
-def get_current_user(token: Annotated[str, Depends(get_token_from_cookie)], db: Session = Depends(get_db)) -> user_model.userSchema:
+async def get_current_user(token: Annotated[str, Depends(get_token_from_cookie)], db: dbSession) -> user_model.userSchema:
     try:
         token_data = verify_token(token)
     except AuthenticationError as e:
@@ -64,7 +67,10 @@ def get_current_user(token: Annotated[str, Depends(get_token_from_cookie)], db: 
             detail=f"Invalid token: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    user = db.query(user_model.userSchema).filter(user_model.userSchema.id == token_data.user_id).first()
+    result = await db.execute(
+        select(user_model.userSchema).where(user_model.userSchema.id == token_data.user_id)
+    )
+    user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -75,8 +81,8 @@ CurrentUser = Annotated[user_model.userSchema, Depends(get_current_user)]
 
 
 
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db), remember: bool = False) -> auth_model.Token:
-    user = authenticate_user(form_data.username, form_data.password, db)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: dbSession = None, remember: bool = False) -> auth_model.Token:
+    user = await authenticate_user(form_data.username, form_data.password, db)
     if not user:
         logging.warning(f"Authentication failed for user: {form_data.username}")
         raise AuthenticationError()
