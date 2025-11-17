@@ -65,14 +65,11 @@ async def register_user(user: UserBase, db: dbSession):
     return await create_user(user, db)
 
 @router.post("/login", response_model=Token)
-async def login(response: Response, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: dbSession, remember: bool = False, request: Request | None = None):
+async def login(response: Response, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: dbSession, remember: bool = False, request: Request = None):
     token = await login_for_access_token(form_data, db, remember)
     
     # Set token in cookie with Partitioned attribute
     max_age = 7*24*60*60 if remember else 24*60*60  # 7 days if remember, else 1 day
-    # request will always be provided by FastAPI if in params
-    if request is None:
-        raise RuntimeError("Request is required for setting cookie attributes")
     set_auth_cookie(response, token.access_token, request, max_age)
     
     return token
