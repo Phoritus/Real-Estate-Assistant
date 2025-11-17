@@ -1,9 +1,11 @@
 import { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
+import { BASE_URL } from '../config/env.tsx'
+
 
 const axiosInstance = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BASE_URL,
   withCredentials: true,
 });
 

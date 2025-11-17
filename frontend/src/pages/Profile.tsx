@@ -6,9 +6,10 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { AuthContext } from '../context/AuthContext';
 import LoadingIcon from '../components/LoadingIcon.tsx';
 import axios from 'axios';
+import { BASE_URL } from '../config/env.tsx'
 
 const axiosInstance = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BASE_URL,
   withCredentials: true,
 });
 
