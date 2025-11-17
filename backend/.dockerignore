@@ -1,22 +1,58 @@
-# flyctl launch added from .gitignore
-**\.env
-**\.env.*.local
-**\.vscode
-**\.idea
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.pytest_cache
+.coverage
+htmlcov
 
-# Python caches
-**\__pycache__
-**\**\__pycache__
-**\*.py[cod]
-**\*$py.class
+# Virtual Environment
+venv
+env
+ENV
+.venv
 
-# flyctl launch added from .idea\.gitignore
-# Default ignored files
-.idea\shelf
-.idea\workspace.xml
-# Editor-based HTTP Client requests
-.idea\httpRequests
-# Datasource local storage ignored files
-.idea\dataSources
-.idea\dataSources.local.xml
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Other
+node_modules
+README.md
+.dockerignore
+Dockerfile
+docker-compose.yml
 fly.toml

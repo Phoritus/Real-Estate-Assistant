@@ -12,7 +12,6 @@ from router import auth_routes, user_routes, process_routes
 from database.postgresdb import engine
 from models import user_model
 from middlewares.error_middleware import setup_exception_handlers
-from env import PORT, DEV_PORT
 
 # print("Server startup: Initializing components...")
 # print("Creating database tables...📑")
@@ -20,7 +19,7 @@ from env import PORT, DEV_PORT
 # print("Database tables created.✅")
 
 origin = [
-    DEV_PORT
+    "https://real-estate-assistant-9rg5llrh4-phoritus-projects.vercel.app"
     
 ]
 
@@ -44,3 +43,7 @@ app.include_router(process_routes.process_router)
 @app.get("/", response_class=HTMLResponse)
 async def root():
     return HTML_CONTENT
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
