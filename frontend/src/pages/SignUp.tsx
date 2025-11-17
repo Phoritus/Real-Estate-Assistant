@@ -18,7 +18,6 @@ const axiosInstance = axios.create({
 export default function SignUp() {
   const auth = useContext(AuthContext);
   const isAuthenticated = Boolean(auth?.isAuthenticated);
-  const login = auth?.login ?? (async () => {});
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
