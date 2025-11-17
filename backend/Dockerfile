@@ -15,7 +15,6 @@ COPY . .
 
 EXPOSE 8080
 
-# ปิด warning
 ENV USER_AGENT="real-estate-api/1.0"
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
