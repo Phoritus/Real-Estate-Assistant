@@ -1,0 +1,11 @@
+{
+	"version": 2,
+	"rewrites": [
+		{ "source": "/auth/:path*", "destination": "https://backend-dawn-dew-5307.fly.dev/auth/:path*" },
+		{ "source": "/process/:path*", "destination": "https://backend-dawn-dew-5307.fly.dev/process/:path*" },
+		{ "source": "/users/:path*", "destination": "https://backend-dawn-dew-5307.fly.dev/users/:path*" },
+
+		{ "source": "/", "destination": "/index.html" },
+		{ "source": "/:path*", "destination": "/index.html" }
+	]
+}
