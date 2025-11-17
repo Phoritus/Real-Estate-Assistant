@@ -12,6 +12,8 @@ from router import auth_routes, user_routes, process_routes
 from database.postgresdb import engine
 from models import user_model
 from middlewares.error_middleware import setup_exception_handlers
+import uvicorn
+
 
 # print("Server startup: Initializing components...")
 # print("Creating database tables...📑")
@@ -48,3 +50,6 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8080)

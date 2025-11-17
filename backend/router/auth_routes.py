@@ -70,7 +70,7 @@ async def handle_google_callback(request: Request, db: dbSession):
     token = await login_with_google(user_info, db)
     
     # Redirect to home and set token in cookie
-    front_url = "http://localhost:5173"
+    front_url = "https://real-estate-assistant-vert.vercel.app"
     response = RedirectResponse(url=front_url, status_code=status.HTTP_302_FOUND)
     
     response.set_cookie(
@@ -94,7 +94,7 @@ async def handle_facebook_callback(request: Request, db: dbSession):
     user_info = await facebook_callback(request)
     token = await login_with_facebook(user_info, db)
 
-    front_url = "http://localhost:5173"
+    front_url = "https://real-estate-assistant-vert.vercel.app"
     response = RedirectResponse(url=front_url, status_code=status.HTTP_302_FOUND)
     response.set_cookie(
         key="access_token",
@@ -118,7 +118,7 @@ async def handle_github_callback(request: Request, db: dbSession):
     user_info = await github_callback(request)
     token = await login_with_github(user_info, db)
 
-    front_url = "http://localhost:5173"
+    front_url = "https://real-estate-assistant-vert.vercel.app"
     response = RedirectResponse(url=front_url, status_code=status.HTTP_302_FOUND)
     response.set_cookie(
         key="access_token",
