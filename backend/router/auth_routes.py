@@ -41,7 +41,8 @@ async def login(response: Response, form_data: Annotated[OAuth2PasswordRequestFo
         httponly=True,
         max_age=7*24*60*60 if remember else None,  # 7 days if remember is True
         samesite="None",
-        secure=True # in production
+        secure=True, # in production
+        partitioned=True
     )
     
     return token
@@ -79,7 +80,8 @@ async def handle_google_callback(request: Request, db: dbSession):
         httponly=True,
         max_age=7*24*60*60,  # 7 days
         samesite="None",
-        secure=True # in production
+        secure=True, # in production
+        partitioned=True
     )
     return response
 
@@ -102,7 +104,8 @@ async def handle_facebook_callback(request: Request, db: dbSession):
         httponly=True,
         max_age=7*24*60*60,
         samesite="None",
-        secure=True # in production
+        secure=True, # in production
+        partitioned=True
     )
     return response
 
@@ -126,6 +129,7 @@ async def handle_github_callback(request: Request, db: dbSession):
         httponly=True,
         max_age=7*24*60*60,
         samesite="None",
-        secure=True # in production
+        secure=True, # in production
+        partitioned=True
     )
     return response
