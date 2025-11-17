@@ -19,7 +19,8 @@ from middlewares.error_middleware import setup_exception_handlers
 # print("Database tables created.✅")
 
 origin = [
-    "https://real-estate-assistant-9rg5llrh4-phoritus-projects.vercel.app"
+    "https://real-estate-assistant-9rg5llrh4-phoritus-projects.vercel.app",
+    "https://real-estate-assistant-vert.vercel.app"
     
 ]
 
