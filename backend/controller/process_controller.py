@@ -1,7 +1,12 @@
 from env import GROQ_API_KEY, CHROMA_API_KEY, CHROMA_TENANT, CHROMA_DATABASE
 from uuid import uuid4
+import asyncio
 
-from langchain_community.document_loaders import WebBaseLoader
+import os
+import time
+import httpx
+from bs4 import BeautifulSoup
+from langchain_core.documents import Document
 from langchain_groq import ChatGroq
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
@@ -11,6 +16,15 @@ import re
 from fastapi import HTTPException
 import chromadb
 from chromadb.utils import embedding_functions
+
+# --- Performance and fetch controls ---
+USER_AGENT = os.environ.get("USER_AGENT", "real-estate-api/1.0")
+HTTP_TIMEOUT = float(os.environ.get("PROCESS_HTTP_TIMEOUT", 15))  # seconds
+MAX_BYTES = int(os.environ.get("PROCESS_MAX_BYTES", 2 * 1024 * 1024))  # 2 MB
+ALLOWED_CONTENT_TYPES = ("text/html", "text/plain")
+MAX_CHUNKS_PER_URL = int(os.environ.get("PROCESS_MAX_CHUNKS_PER_URL", 200))
+PROCESS_CONCURRENCY = int(os.environ.get("PROCESS_CONCURRENCY", 2))
+CHROMA_COLLECTION = os.environ.get("CHROMA_COLLECTION", "real_estate_documents")
 
 # --- Pydantic Models for API Request/Response ---
 
@@ -47,10 +61,21 @@ def initialize_component():
     print("Initialized LLM")
 
     print("Initial Embeddings Function (Chroma)")
-    # Use Chroma's embedding function compatible with Cloud collections
-    embeddings = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="BAAI/bge-small-en-v1.5"
-    )
+    # Optionally offload to OpenAI for faster embeddings (network-bound)
+    provider = os.environ.get("EMBEDDINGS_PROVIDER", "local").lower()
+    if provider == "openai" and os.environ.get("OPENAI_API_KEY"):
+        from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+        embeddings = OpenAIEmbeddingFunction(
+            api_key=os.environ["OPENAI_API_KEY"],
+            model_name=os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
+        )
+        print("Initialized OpenAI Embedding Function")
+    else:
+        local_model = os.environ.get("PROCESS_EMBED_MODEL", "all-MiniLM-L6-v2")
+        embeddings = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name=local_model
+        )
+        print("Initialized Local SentenceTransformer Embeddings")
     print("Initialized Embeddings Function")
 
     # Initialize Chroma Cloud client lazily to avoid import-time env delays
@@ -63,14 +88,57 @@ def initialize_component():
         database=CHROMA_DATABASE,
     )
     vector_store = client.get_or_create_collection(
-        name="real_estate_documents",
+        name=CHROMA_COLLECTION,
         embedding_function=embeddings,
     )
     print("Initialized Chroma Cloud Collection")
 
 
 
-def process_single_url(url: str) -> int:
+async def _fetch_url_text(url: str) -> str:
+    """Fetch URL with timeout and size cap; return cleaned text."""
+    headers = {"User-Agent": USER_AGENT, "Accept": ", ".join(ALLOWED_CONTENT_TYPES)}
+    t0 = time.perf_counter()
+    async with httpx.AsyncClient(timeout=httpx.Timeout(HTTP_TIMEOUT, read=HTTP_TIMEOUT), follow_redirects=True, headers=headers) as client:
+        # Preflight HEAD to check content type/length when available
+        try:
+            head = await client.head(url)
+            ctype = head.headers.get("Content-Type", "").split(";")[0].lower()
+            if ctype and not any(ctype.startswith(a) for a in ALLOWED_CONTENT_TYPES):
+                raise HTTPException(status_code=400, detail=f"Unsupported content type: {ctype}")
+        except Exception:
+            pass
+
+        # Stream body with cap
+        r = await client.get(url)
+        r.raise_for_status()
+        ctype = r.headers.get("Content-Type", "").split(";")[0].lower()
+        if ctype and not any(ctype.startswith(a) for a in ALLOWED_CONTENT_TYPES):
+            raise HTTPException(status_code=400, detail=f"Unsupported content type: {ctype}")
+
+        collected = bytearray()
+        async for chunk in r.aiter_bytes():
+            if chunk:
+                if len(collected) + len(chunk) > MAX_BYTES:
+                    collected.extend(chunk[: MAX_BYTES - len(collected)])
+                    break
+                collected.extend(chunk)
+        html = collected.decode(errors="ignore")
+    t_fetch = time.perf_counter() - t0
+    print(f"Fetched {url} in {t_fetch:.2f}s, size={len(html):,} bytes (cap {MAX_BYTES:,})")
+
+    # Parse to text
+    t1 = time.perf_counter()
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+    text = "\n".join(line.strip() for line in soup.get_text(separator="\n").splitlines() if line.strip())
+    t_parse = time.perf_counter() - t1
+    print(f"Parsed HTML to text in {t_parse:.2f}s (len={len(text):,})")
+    return text
+
+
+async def process_single_url(url: str) -> int:
     """
     Process a single URL: load, split, embed, and store in the vector store.
     Returns the number of chunks added for this URL.
@@ -79,8 +147,21 @@ def process_single_url(url: str) -> int:
         print("Components not initialized. Please call initialize_component() first.")
         raise Exception("Components not initialized.")
 
-    loader = WebBaseLoader([url])
-    documents = loader.load()
+    # Skip if already ingested for this source
+    try:
+        existing = vector_store.get(where={"source": url}, limit=1)
+        if existing and existing.get("ids"):
+            print(f"URL already ingested, skipping: {url}")
+            return 0
+    except Exception as e:
+        print(f"Skip check failed for {url}: {e}")
+
+    # Fetch and build a single Document
+    text = await _fetch_url_text(url)
+    if not text:
+        print(f"No text extracted for {url}")
+        return 0
+    documents = [Document(page_content=text, metadata={"source": url})]
 
     print(f"Splitting documents for URL: {url} ...")
     text_splitter = RecursiveCharacterTextSplitter(
@@ -88,18 +169,28 @@ def process_single_url(url: str) -> int:
         chunk_size=1000,
         chunk_overlap=200,
     )
+    t0 = time.perf_counter()
     docs = text_splitter.split_documents(documents)
+    if len(docs) > MAX_CHUNKS_PER_URL:
+        docs = docs[:MAX_CHUNKS_PER_URL]
+        print(f"Capped chunks to {MAX_CHUNKS_PER_URL} for {url}")
+    t_split = time.perf_counter() - t0
+    print(f"Split into {len(docs)} chunks in {t_split:.2f}s")
     print(f"URL {url} split completed. Found {len(docs)} chunks.")
 
     print(f"Adding {len(docs)} chunks to vector store for URL: {url} ...")
     uid = [str(uuid4()) for _ in range(len(docs))]
 
     # Upsert raw texts and metadatas into Chroma Cloud
+    t0 = time.perf_counter()
+    # Upsert (sync IO) may take time; keep it sync but measured
     vector_store.upsert(
         documents=[d.page_content for d in docs],
         metadatas=[d.metadata for d in docs],
         ids=uid,
     )
+    t_upsert = time.perf_counter() - t0
+    print(f"Upserted {len(docs)} chunks in {t_upsert:.2f}s (embeddings + network)")
     try:
         total = vector_store.count()
     except Exception:
@@ -225,7 +316,7 @@ def initialize_process():
         print(f"Error initializing components: {e}")
         raise HTTPException(status_code=500, detail=f"Error initializing components: {str(e)}")
       
-def process_urls(payload: UrlList):
+async def process_urls(payload: UrlList):
     """
     Accept a list of URLs, process each URL to extract text,
     split into chunks, generate embeddings, and store in Vector Store.
@@ -238,14 +329,20 @@ def process_urls(payload: UrlList):
     successes = []  # list of {url, chunks}
     failures = []   # list of {url, error}
 
-    for url in url_strings:
+    sem = asyncio.Semaphore(PROCESS_CONCURRENCY)
+
+    async def worker(u: str):
+        nonlocal total_chunks
         try:
-            chunks = process_single_url(url)
+            async with sem:
+                chunks = await process_single_url(u)
             total_chunks += chunks
-            successes.append({"url": url, "chunks": chunks})
+            successes.append({"url": u, "chunks": chunks})
         except Exception as e:
-            print(f"Error processing URL {url}: {e}")
-            failures.append({"url": url, "error": str(e)})
+            print(f"Error processing URL {u}: {e}")
+            failures.append({"url": u, "error": str(e)})
+
+    await asyncio.gather(*(worker(u) for u in url_strings))
 
     message = (
         f"Processed {len(url_strings)} URLs. "

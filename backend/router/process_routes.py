@@ -21,7 +21,7 @@ process_router = APIRouter(
 @limiter.limit("5/minute")
 async def process_url_list(payload: UrlList, request: Request):
     initialize_process()
-    return process_urls(payload)
+    return await process_urls(payload)
 
 
 @process_router.post("/query", response_model=AnswerResponse)
