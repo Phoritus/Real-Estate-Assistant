@@ -26,9 +26,18 @@ router = APIRouter(
     tags=["auth"]
 )
 
+def _is_secure_request(request: Request) -> bool:
+    # Honor reverse proxy headers (Fly, etc.)
+    xf_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    if xf_proto:
+        return xf_proto == "https"
+    return request.url.scheme == "https"
+
 def set_auth_cookie(response: Response, token: str, request: Request, max_age: int | None = None):
-    """Set authentication cookie. Uses Partitioned+SameSite=None for HTTPS, relaxed for local HTTP dev."""
-    is_https = request.url.scheme == "https"
+    """Set authentication cookie. Uses Partitioned+SameSite=None for secure (HTTPS) contexts.
+    Falls back to SameSite=Lax for plain HTTP (local dev) where Secure+None would be rejected.
+    """
+    is_https = _is_secure_request(request)
     parts = [
         f"access_token={token}",
         "Path=/",
@@ -47,7 +56,7 @@ def set_auth_cookie(response: Response, token: str, request: Request, max_age: i
 
 
 def clear_auth_cookie(response: Response, request: Request):
-    is_https = request.url.scheme == "https"
+    is_https = _is_secure_request(request)
     parts = [
         "access_token=",
         "Path=/",
