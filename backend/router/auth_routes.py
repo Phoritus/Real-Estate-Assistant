@@ -26,66 +26,35 @@ router = APIRouter(
     tags=["auth"]
 )
 
-def _is_secure_request(request: Request) -> bool:
-    # Honor reverse proxy headers (Fly, etc.)
-    xf_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
-    if xf_proto:
-        return xf_proto == "https"
-    return request.url.scheme == "https"
-
-def set_auth_cookie(response: Response, token: str, request: Request, max_age: int | None = None):
-    """Set authentication cookie. Uses Partitioned+SameSite=None for secure (HTTPS) contexts.
-    Falls back to SameSite=Lax for plain HTTP (local dev) where Secure+None would be rejected.
-    """
-    is_https = _is_secure_request(request)
-    parts = [
-        f"access_token={token}",
-        "Path=/",
-        "HttpOnly",
-    ]
-    if max_age:
-        parts.append(f"Max-Age={max_age}")
-
-    if is_https:
-        parts.extend(["Secure", "SameSite=None", "Partitioned"])
-    else:
-        # Local dev over http cannot use Secure/None; fall back to Lax
-        parts.append("SameSite=Lax")
-
-    response.headers.append("Set-Cookie", "; ".join(parts))
-
-
-def clear_auth_cookie(response: Response, request: Request):
-    is_https = _is_secure_request(request)
-    parts = [
-        "access_token=",
-        "Path=/",
-        "HttpOnly",
-        "Max-Age=0",
-    ]
-    if is_https:
-        parts.extend(["Secure", "SameSite=None", "Partitioned"])
-    else:
-        parts.append("SameSite=Lax")
-    response.headers.append("Set-Cookie", "; ".join(parts))
-
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_user(user: UserBase, db: dbSession):
     return await create_user(user, db)
 
 @router.post("/login", response_model=Token)
-async def login(response: Response, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: dbSession, remember: bool = False, request: Request = None):
+async def login(response: Response, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: dbSession, remember: bool = False):
     token = await login_for_access_token(form_data, db, remember)
     
-    # Set token in cookie with Partitioned attribute
-    max_age = 7*24*60*60 if remember else 24*60*60  # 7 days if remember, else 1 day
-    set_auth_cookie(response, token.access_token, request, max_age)
+    # set token in a cookie
+    response.set_cookie(
+        key="access_token",
+        value=token.access_token,
+        httponly=True,
+        max_age=7*24*60*60 if remember else None,  # 7 days if remember is True
+        samesite="None",
+        secure=True # in production
+    )
     
     return token
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
-async def logout(response: Response, request: Request):
-    clear_auth_cookie(response, request)
+async def logout(response: Response):
+    # Clear the access token cookie
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        samesite="lax",
+        secure=True # in production
+    )
     return {"detail": "Successfully logged out."}
 
 
@@ -104,9 +73,14 @@ async def handle_google_callback(request: Request, db: dbSession):
     front_url = "https://real-estate-assistant-vert.vercel.app"
     response = RedirectResponse(url=front_url, status_code=status.HTTP_302_FOUND)
     
-    # Set cookie with appropriate attributes based on scheme
-    set_auth_cookie(response, token.access_token, request, 7*24*60*60)
-    
+    response.set_cookie(
+        key="access_token",
+        value=token.access_token,
+        httponly=True,
+        max_age=7*24*60*60,  # 7 days
+        samesite="None",
+        secure=True # in production
+    )
     return response
 
 # Facebook OAuth routes
@@ -122,10 +96,14 @@ async def handle_facebook_callback(request: Request, db: dbSession):
 
     front_url = "https://real-estate-assistant-vert.vercel.app"
     response = RedirectResponse(url=front_url, status_code=status.HTTP_302_FOUND)
-    
-    # Set cookie with appropriate attributes based on scheme
-    set_auth_cookie(response, token.access_token, request, 7*24*60*60)
-    
+    response.set_cookie(
+        key="access_token",
+        value=token.access_token,
+        httponly=True,
+        max_age=7*24*60*60,
+        samesite="None",
+        secure=True # in production
+    )
     return response
 
 
@@ -142,8 +120,12 @@ async def handle_github_callback(request: Request, db: dbSession):
 
     front_url = "https://real-estate-assistant-vert.vercel.app"
     response = RedirectResponse(url=front_url, status_code=status.HTTP_302_FOUND)
-    
-    # Set cookie with appropriate attributes based on scheme
-    set_auth_cookie(response, token.access_token, request, 7*24*60*60)
-    
+    response.set_cookie(
+        key="access_token",
+        value=token.access_token,
+        httponly=True,
+        max_age=7*24*60*60,
+        samesite="None",
+        secure=True # in production
+    )
     return response

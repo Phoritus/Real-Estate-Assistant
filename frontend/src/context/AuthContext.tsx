@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
     const checkedOnce = useRef(false);
 
-    const USER_KEY = 'auth_user';
+    const USER_KEY = 'access_token';
 
   useEffect(() => {
     // First attempt: load from localStorage to avoid network call

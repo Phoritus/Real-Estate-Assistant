@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 import logging
 from middlewares.exceptions import AuthenticationError, AuthenticationWithCookie
+from models.auth_model import Token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")  # Include prefix so docs/forms work
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # Password hashing context
@@ -81,13 +82,13 @@ CurrentUser = Annotated[user_model.userSchema, Depends(get_current_user)]
 
 
 
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: dbSession = None, remember: bool = False) -> auth_model.Token:
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: dbSession = None, remember: bool = False) -> Token:
     user = await authenticate_user(form_data.username, form_data.password, db)
     if not user:
         logging.warning(f"Authentication failed for user: {form_data.username}")
         raise AuthenticationError()
     access_token = create_access_token(subject=user.email, user_id=user.id, remember=remember)
     logging.info(f"User {form_data.username} authenticated successfully.")
-    return auth_model.Token(access_token=access_token, token_type="bearer")
+    return Token(access_token=access_token, token_type="bearer")
 
 
