@@ -1,9 +1,6 @@
 from env import GROQ_API_KEY, CHROMA_API_KEY, CHROMA_TENANT, CHROMA_DATABASE
 from uuid import uuid4
 
-if not GROQ_API_KEY:
-    raise Exception("GROQ_API_KEY not set in environment variables.")
-
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_groq import ChatGroq
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -14,12 +11,6 @@ import re
 from fastapi import HTTPException
 import chromadb
 from chromadb.utils import embedding_functions
-
-client = chromadb.CloudClient(
-  api_key=CHROMA_API_KEY,
-  tenant=CHROMA_TENANT,
-  database=CHROMA_DATABASE
-)
 
 # --- Pydantic Models for API Request/Response ---
 
@@ -46,6 +37,8 @@ def initialize_component():
     global llm, embeddings, vector_store, client
 
     print("Initial LLM")
+    if not GROQ_API_KEY:
+        raise Exception("GROQ_API_KEY not set in environment variables.")
     llm = ChatGroq(
         api_key=GROQ_API_KEY,
         model="meta-llama/llama-4-maverick-17b-128e-instruct",
@@ -60,7 +53,7 @@ def initialize_component():
     )
     print("Initialized Embeddings Function")
 
-    # Initialize Chroma Cloud client lazily to avoid import-time env errors
+    # Initialize Chroma Cloud client lazily to avoid import-time env delays
     if not (CHROMA_API_KEY and CHROMA_TENANT and CHROMA_DATABASE):
         raise Exception("Chroma Cloud environment variables are not configured.")
     print("Initial Chroma Cloud Collection")
