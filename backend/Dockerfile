@@ -6,11 +6,6 @@ COPY requirements.txt .
     
 RUN pip install --no-cache-dir -r requirements.txt
 
-
-RUN python -c "from sentence_transformers import SentenceTransformer; \
-    model = SentenceTransformer('BAAI/bge-small-en-v1.5'); \
-    print('Model downloaded successfully')"
-
 COPY . .
 
 EXPOSE 8080
