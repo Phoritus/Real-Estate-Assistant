@@ -15,7 +15,6 @@ import {
   Divider,
   Alert,
 } from "@mui/material";
-import FacebookIcon from "@mui/icons-material/Facebook";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import GoogleIcon from "@mui/icons-material/Google";
 import Visibility from "@mui/icons-material/Visibility";
@@ -54,16 +53,6 @@ export default function Login() {
     }
   };
 
-  const oauthLoginFacebook = async () => {
-    try {
-      const response = await axiosInstance.get("/auth/facebook-login-url");
-      const { url } = response.data;
-      window.location.href = url;
-    } catch (error) {
-      console.error("Failed to get Facebook login URL", error);
-      setLoginError("Could not connect to Facebook Sign-In.");
-    }
-  };
 
   const oauthLoginGitHub = async () => {
     try {
@@ -140,14 +129,7 @@ export default function Login() {
               justifyContent="center"
               sx={{ mt: 2 }}
             >
-              <IconButton
-                color="inherit"
-                size="large"
-                aria-label="Sign in with Facebook"
-                onClick={oauthLoginFacebook}
-              >
-                <FacebookIcon sx={{ color: "white" }} />
-              </IconButton>
+              {/* Facebook login removed */}
               <IconButton
                 color="inherit"
                 size="large"

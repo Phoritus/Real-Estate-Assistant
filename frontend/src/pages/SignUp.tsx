@@ -4,7 +4,6 @@ import { useNavigate, Navigate, Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Container, IconButton, Paper, Stack, Switch, TextField, Typography, FormControlLabel, Divider, Alert } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import FacebookIcon from '@mui/icons-material/Facebook';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import GoogleIcon from '@mui/icons-material/Google';
 import LoadingIcon from '../components/LoadingIcon.tsx';
@@ -76,15 +75,6 @@ export default function SignUp() {
     }
   };
 
-  const oauthLoginFacebook = async () => {
-    try {
-      const response = await axiosInstance.get('/auth/facebook-login-url');
-      const { url } = response.data;
-      window.location.href = url;
-    } catch (e) {
-      setError('Could not connect to Facebook Sign-In.');
-    }
-  };
 
   const oauthLoginGitHub = async () => {
     try {
@@ -107,7 +97,7 @@ export default function SignUp() {
           }}>
             <Typography variant="h5" fontWeight={800}>Create account</Typography>
             <Stack direction="row" spacing={3} justifyContent="center" sx={{ mt: 2 }}>
-              <IconButton color="inherit" size="large" aria-label="Sign up with Facebook" onClick={oauthLoginFacebook}><FacebookIcon sx={{ color: 'white' }} /></IconButton>
+              {/* Facebook signup removed */}
               <IconButton color="inherit" size="large" aria-label="Sign up with GitHub" onClick={oauthLoginGitHub}><GitHubIcon sx={{ color: 'white' }} /></IconButton>
               <IconButton color="inherit" size="large" aria-label="Sign up with Google" onClick={oauthLoginGoogle}><GoogleIcon sx={{ color: 'white' }} /></IconButton>
             </Stack>

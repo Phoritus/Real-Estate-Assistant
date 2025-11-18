@@ -6,11 +6,6 @@ from starlette import status
 from controller.user_controller import create_user
 from controller.auth_controller import login_for_access_token
 from auth.google_auth_controller import login_with_google, google_login_url, google_callback
-from auth.facebook_auth_controller import (
-    login_with_facebook,
-    facebook_login_url,
-    facebook_callback,
-)
 from auth.github_auth_controller import (
     login_with_github,
     github_login_url,
@@ -83,28 +78,7 @@ async def handle_google_callback(request: Request, db: dbSession):
     )
     return response
 
-# Facebook OAuth routes
-@router.get("/facebook-login-url", status_code=status.HTTP_200_OK)
-async def get_facebook_login_url():
-    url = facebook_login_url()
-    return {"url": url}
-
-@router.get("/facebook-callback")
-async def handle_facebook_callback(request: Request, db: dbSession):
-    user_info = await facebook_callback(request)
-    token = await login_with_facebook(user_info, db)
-
-    front_url = "https://real-estate-assistant-vert.vercel.app"
-    response = RedirectResponse(url=front_url, status_code=status.HTTP_302_FOUND)
-    response.set_cookie(
-        key="access_token",
-        value=token.access_token,
-        httponly=True,
-        max_age=7*24*60*60,
-        samesite="None",
-        secure=True # in production
-    )
-    return response
+# Facebook OAuth removed
 
 
 # GitHub OAuth routes
